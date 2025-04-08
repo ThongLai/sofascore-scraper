@@ -69,9 +69,11 @@ def get_league_matches(seasons='ALL', leagues='ALL'):
     
     return all_matches
 
-def get_teams_in_league(matches):
+def get_teams_in_league(league, season):
     """Get all teams playing in the specified league season."""
     
+    matches = get_league_matches(season, league)
+
     # Extract unique team names
     home_teams = matches['homeTeam'].apply(lambda x: x['name']).unique()
     away_teams = matches['awayTeam'].apply(lambda x: x['name']).unique()
