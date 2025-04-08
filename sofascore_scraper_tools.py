@@ -259,7 +259,7 @@ def collect_teams_data(matches, team_names, columns):
             
     return team_data
 
-def save_excel(team_data, output_file="premier_league_data.xlsx"):
+def save_excel(team_data, output_file="sofascore.xlsx"):
     """
     Create an Excel workbook with a sheet for each team.
     
