@@ -1,3 +1,5 @@
+ALL_LEAGUE = ['Champions League', 'Europa League', 'Europa Conference League', 'EPL', 'La Liga', 'Bundesliga', 'Serie A', 'Ligue 1', 'Turkish Super Lig', 'Argentina Liga Profesional', 'Argentina Copa de la Liga Profesional', 'Liga 1 Peru', 'Copa Libertadores', 'MLS', 'USL Championship', 'USL1', 'USL2', 'Saudi Pro League', 'World Cup', 'Euros', 'Gold Cup', "Women's World Cup"]
+
 import pandas as pd
 import numpy as np
 import ScraperFC as sfc
@@ -10,6 +12,61 @@ from openpyxl.utils import get_column_letter
 from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import PatternFill, Alignment
 
+def get_league_matches(seasons='ALL', leagues='ALL'):
+    """
+    Retrieves match data for specified leagues and seasons from Sofascore.
+    
+    Parameters:
+    -----------
+    leagues : list or str
+        League(s) to fetch match data for. Defaults to ALL_LEAGUE constant.
+    seasons : list or str
+        Season(s) to fetch match data for. Defaults to SEASON constant.
+        
+    Returns:
+    --------
+    pandas.DataFrame
+        DataFrame containing match data sorted by startTimestamp in descending order.
+    """
+    # Initialize an empty DataFrame to store all matches
+    all_matches = pd.DataFrame()
+
+    # Convert single values to lists for consistent processing
+    if not isinstance(leagues, list):
+        leagues = [leagues]
+    
+    if not isinstance(seasons, list):
+        seasons = [seasons]
+    
+    # Iterate through each combination of season and league
+    if leagues[0].upper() == "ALL":
+        leagues = ALL_LEAGUE
+
+    for league in leagues:
+        if seasons[0].upper() == "ALL":
+            seasons = list(sfc.Sofascore().get_valid_seasons(league).keys())
+
+        for season in seasons:
+            try:
+                # Get match data from Sofascore API
+                matches = pd.DataFrame(
+                    sfc.Sofascore().get_match_dicts(season, league)
+                )
+                
+                # Add league and season columns for reference
+                matches['league'] = league
+                matches['season'] = season
+                
+                # Append to the main DataFrame
+                all_matches = pd.concat([all_matches, matches], ignore_index=True)
+                
+            except Exception as e:
+                print(f"Error fetching data for {league} in season {season}: {str(e)}")
+    
+    # Sort all matches by timestamp in descending order (most recent first)
+    all_matches = all_matches.sort_values('startTimestamp', ascending=False)
+    
+    return all_matches
 
 def get_teams_in_league(matches):
     """Get all teams playing in the specified league season."""
@@ -35,14 +92,14 @@ def is_home_match(match, team_name):
     """Check if team is playing at home in this match."""
     return match['homeTeam']['name'] == team_name
 
-def collect_match_data(match, team_name, columns):
+def collect_match_data(match, team_name):
     """Collect match data for the specified team."""
     ss = sfc.Sofascore()
-    match_id = match['id']
+    match_id = str(match['id'])
     
     # Determine if the team is home or away
     is_home = is_home_match(match, team_name)
-    opponent_team = match['awayTeam']['name'] if is_home else match['homeTeam']['name']
+    # opponent_team = match['awayTeam']['name'] if is_home else match['homeTeam']['name']
     
     # Extract basic match info
     match_date = datetime.fromtimestamp(match['startTimestamp']).strftime('%d-%m-%Y')
@@ -54,19 +111,6 @@ def collect_match_data(match, team_name, columns):
     # Get halftime scores
     ht_team_score = match['homeScore']['period1'] if is_home else match['awayScore']['period1']
     ht_opponent_score = match['awayScore']['period1'] if is_home else match['homeScore']['period1']
-
-    # Get match statistics
-    match_stats = ss.scrape_team_match_stats(match_id)
-    
-    corners = match_stats[match_stats['key'].str.contains("corner")]
-    corners_all = corners[corners['period'] == 'ALL'][['home', 'away']].iloc[0]
-    corners_1st = corners[corners['period'] == '1ST'][['home', 'away']].iloc[0]
-    
-    cards = match_stats[match_stats['key'].str.contains("Card")]
-    cards_all = cards[cards['period'] == 'ALL'][['home', 'away']].astype(int).sum()
-    cards_1st = cards[cards['period'] == '1ST'][['home', 'away']].astype(int).sum()
-
-    
     
     # Determine W/L/D (W/L)
     if team_score > opponent_score:
@@ -108,25 +152,43 @@ def collect_match_data(match, team_name, columns):
     
     # Both Teams To Score (BTTS)
     btts = "Y" if team_score > 0 and opponent_score > 0 else "N"
+
+    # -----------Get match statistics------------
+    match_stats = ss.scrape_team_match_stats(match_id)
     
-    # Extract totals of corners (Corner)
-    corners_total = f"{corners_all['home']}-{corners_all['away']}" if is_home else f"{corners_all['away']}-{corners_all['home']}"
-    
-    # Extract totals of cards (Card)
-    cards_total = f"{cards_all['home']}-{cards_all['away']}" if is_home else f"{cards_all['away']}-{cards_all['home']}"
+    if not match_stats.empty:
+        corners = match_stats[match_stats['key'].str.contains("corner")]
+        corners_all = corners[corners['period'] == 'ALL'][['home', 'away']].iloc[0]
+        corners_1st = corners[corners['period'] == '1ST'][['home', 'away']].iloc[0]
         
-    # Extract totals of halftime-corners (Corner HT)
-    corners_ht = f"{corners_1st['home']}-{corners_1st['away']}" if is_home else f"{corners_1st['away']}-{corners_1st['home']}"
+        cards = match_stats[match_stats['key'].str.contains("Card")]
+        cards_all = cards[cards['period'] == 'ALL'][['home', 'away']].astype(int).sum()
+        cards_1st = cards[cards['period'] == '1ST'][['home', 'away']].astype(int).sum()
     
-    # Extract totals of cards (Card HT)
-    cards_ht = f"{cards_1st['home']}-{cards_1st['away']}" if is_home else f"{cards_1st['away']}-{cards_1st['home']}"
+        # Extract totals of corners (Corner)
+        corners_total = f"{corners_all['home']}-{corners_all['away']}" if is_home else f"{corners_all['away']}-{corners_all['home']}"
+        
+        # Extract totals of cards (Card)
+        cards_total = f"{cards_all['home']}-{cards_all['away']}" if is_home else f"{cards_all['away']}-{cards_all['home']}"
+            
+        # Extract totals of halftime-corners (Corner HT)
+        corners_ht = f"{corners_1st['home']}-{corners_1st['away']}" if is_home else f"{corners_1st['away']}-{corners_1st['home']}"
+        
+        # Extract totals of cards (Card HT)
+        cards_ht = f"{cards_1st['home']}-{cards_1st['away']}" if is_home else f"{cards_1st['away']}-{cards_1st['home']}"
+    else:
+        # If no match stats are available, set to None
+        corners_total = None
+        cards_total = None
+        corners_ht = None
+        cards_ht = None
         
     # ASIAN Handicap - this would require additional data not easily available from basic stats
     asian_handicap = None
     handicap_value = None
 
     # Create a dictionary with all the processed data
-    match_data = [
+    data = [
         result,
         over_under,
         total_goals,
@@ -146,7 +208,7 @@ def collect_match_data(match, team_name, columns):
         match_date
     ]
     
-    return dict(zip(columns, match_data))
+    return data
 
 def collect_teams_data(matches, team_names, columns):
     """Collect a dataframe with all match data for all teams in `team_names`."""
@@ -159,11 +221,14 @@ def collect_teams_data(matches, team_names, columns):
         match_data = []
         
         for _, match in tqdm(team_matches.iterrows(), desc=f"Processing `{team_name}` matches", total=len(team_matches)):
-            if match['status']['code'] == 100:  # Only completed matches
+            if match['status']['type'] == 'finished':  # Only completed matches
                 try:
-                    match_data.append(collect_match_data(match, team_name, columns))
+                    data = collect_match_data(match, team_name)
+
+                    # Append the data to the match_data list
+                    match_data.append(dict(zip(columns, data)))
                 except Exception as e:
-                    print(f"Error processing match `{match['id']}` for {team_name}: `{str(e)}`")
+                    print(f"Error processing match `{match['id']}` for `{team_name}`: `{str(e)}`")
                     continue
         
         # Create dataframe
