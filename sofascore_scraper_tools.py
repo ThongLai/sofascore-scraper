@@ -1,5 +1,3 @@
-ALL_LEAGUE = ['Champions League', 'Europa League', 'Europa Conference League', 'EPL', 'La Liga', 'Bundesliga', 'Serie A', 'Ligue 1', 'Turkish Super Lig', 'Argentina Liga Profesional', 'Argentina Copa de la Liga Profesional', 'Liga 1 Peru', 'Copa Libertadores', 'MLS', 'USL Championship', 'USL1', 'USL2', 'Saudi Pro League', 'World Cup', 'Euros', 'Gold Cup', "Women's World Cup"]
-
 import pandas as pd
 import numpy as np
 import ScraperFC as sfc
@@ -12,6 +10,8 @@ import warnings
 from openpyxl.utils import get_column_letter
 from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import PatternFill, Alignment
+
+ALL_LEAGUE = list(sfc.sofascore.comps.keys())
 
 def get_league_matches(seasons_config='ALL', leagues_config='ALL'):
     """
