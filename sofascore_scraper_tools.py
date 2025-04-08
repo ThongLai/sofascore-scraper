@@ -13,7 +13,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import PatternFill, Alignment
 
-def get_league_matches(seasons='ALL', leagues='ALL'):
+def get_league_matches(seasons_config='ALL', leagues_config='ALL'):
     """
     Retrieves match data for specified leagues and seasons from Sofascore.
     
@@ -33,19 +33,25 @@ def get_league_matches(seasons='ALL', leagues='ALL'):
     all_matches = pd.DataFrame()
 
     # Convert single values to lists for consistent processing
-    if not isinstance(leagues, list):
-        leagues = [leagues]
+    if not isinstance(leagues_config, list):
+        leagues_config = [leagues_config]
     
-    if not isinstance(seasons, list):
-        seasons = [seasons]
+    if not isinstance(seasons_config, list):
+        seasons_config = [seasons_config]
     
     # Iterate through each combination of season and league
-    if leagues[0].upper() == "ALL":
+    if not leagues_config or leagues_config[0].upper() == "ALL":
         leagues = ALL_LEAGUE
+    else:
+        leagues = leagues_config
 
     for league in leagues:
-        if seasons[0].upper() == "ALL":
+        if not seasons_config or seasons_config[0].upper() == "ALL":
             seasons = list(sfc.Sofascore().get_valid_seasons(league).keys())
+        elif seasons_config[0].upper() == "LATEST":
+            seasons = [list(sfc.Sofascore().get_valid_seasons(league).keys())[0]]
+        else:
+            seasons = seasons_config
 
         for season in seasons:
             try:
@@ -98,7 +104,7 @@ def is_home_match(match, team_name):
 def collect_match_data(match, team_name):
     """Collect match data for the specified team."""
     ss = sfc.Sofascore()
-    match_id = str(match['id'])
+    match_id = int(match['id'])
     
     # Determine if the team is home or away
     is_home = is_home_match(match, team_name)
