@@ -7,6 +7,7 @@ from datetime import datetime
 import os
 import time
 from tqdm import tqdm
+import warnings
 
 from openpyxl.utils import get_column_letter
 from openpyxl.formatting.rule import CellIsRule
@@ -154,34 +155,49 @@ def collect_match_data(match, team_name):
     btts = "Y" if team_score > 0 and opponent_score > 0 else "N"
 
     # -----------Get match statistics------------
-    match_stats = ss.scrape_team_match_stats(match_id)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        match_stats = ss.scrape_team_match_stats(match_id)
+
+    # If no match stats are available, set to None
+    corners_total = None
+    cards_total = None
+    corners_ht = None
+    cards_ht = None
     
     if not match_stats.empty:
         corners = match_stats[match_stats['key'].str.contains("corner")]
-        corners_all = corners[corners['period'] == 'ALL'][['home', 'away']].iloc[0]
-        corners_1st = corners[corners['period'] == '1ST'][['home', 'away']].iloc[0]
-        
         cards = match_stats[match_stats['key'].str.contains("Card")]
-        cards_all = cards[cards['period'] == 'ALL'][['home', 'away']].astype(int).sum()
-        cards_1st = cards[cards['period'] == '1ST'][['home', 'away']].astype(int).sum()
-    
-        # Extract totals of corners (Corner)
-        corners_total = f"{corners_all['home']}-{corners_all['away']}" if is_home else f"{corners_all['away']}-{corners_all['home']}"
         
-        # Extract totals of cards (Card)
-        cards_total = f"{cards_all['home']}-{cards_all['away']}" if is_home else f"{cards_all['away']}-{cards_all['home']}"
+        try:
+            # Extract totals of corners (Corner)
+            corners_all = corners[corners['period'] == 'ALL'][['home', 'away']].iloc[0]
+            corners_total = f"{corners_all['home']}-{corners_all['away']}" if is_home else f"{corners_all['away']}-{corners_all['home']}"
+        except:
+            pass
+
+        try:
+            # Extract totals of halftime-corners (Corner HT)
+            corners_1st = corners[corners['period'] == '1ST'][['home', 'away']].iloc[0]
+            corners_ht = f"{corners_1st['home']}-{corners_1st['away']}" if is_home else f"{corners_1st['away']}-{corners_1st['home']}"
+        except:
+            pass
             
-        # Extract totals of halftime-corners (Corner HT)
-        corners_ht = f"{corners_1st['home']}-{corners_1st['away']}" if is_home else f"{corners_1st['away']}-{corners_1st['home']}"
+
+        try:
+            # Extract totals of cards (Card)
+            cards_all = cards[cards['period'] == 'ALL'][['home', 'away']].astype(int).sum()
+            cards_total = f"{cards_all['home']}-{cards_all['away']}" if is_home else f"{cards_all['away']}-{cards_all['home']}"
+        except:
+            pass
         
+        try:
         # Extract totals of cards (Card HT)
-        cards_ht = f"{cards_1st['home']}-{cards_1st['away']}" if is_home else f"{cards_1st['away']}-{cards_1st['home']}"
-    else:
-        # If no match stats are available, set to None
-        corners_total = None
-        cards_total = None
-        corners_ht = None
-        cards_ht = None
+            cards_1st = cards[cards['period'] == '1ST'][['home', 'away']].astype(int).sum()
+            cards_ht = f"{cards_1st['home']}-{cards_1st['away']}" if is_home else f"{cards_1st['away']}-{cards_1st['home']}"
+        except:
+            pass
         
     # ASIAN Handicap - this would require additional data not easily available from basic stats
     asian_handicap = None
