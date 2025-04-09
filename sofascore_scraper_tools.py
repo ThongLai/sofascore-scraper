@@ -178,10 +178,6 @@ def collect_match_data(match, team_name):
     team_score = match['homeScore']['current'] if is_home else match['awayScore']['current']
     opponent_score = match['awayScore']['current'] if is_home else match['homeScore']['current']
     
-    # Get halftime scores
-    ht_team_score = match['homeScore']['period1'] if is_home else match['awayScore']['period1']
-    ht_opponent_score = match['awayScore']['period1'] if is_home else match['homeScore']['period1']
-    
     # Determine W/L/D (W/L)
     if team_score > opponent_score:
         result = "W"
@@ -203,7 +199,15 @@ def collect_match_data(match, team_name):
     correct_score = f"{team_score}-{opponent_score}"
     
     # Half Time Score (HT)
-    ht_score = f"{ht_team_score}-{ht_opponent_score}"
+    ht_score = None
+    try:
+        # Get halftime scores (some old matches may not have this data)
+        ht_team_score = match['homeScore']['period1'] if is_home else match['awayScore']['period1']
+        ht_opponent_score = match['awayScore']['period1'] if is_home else match['homeScore']['period1']
+
+        ht_score = f"{ht_team_score}-{ht_opponent_score}"
+    except:
+        pass
     
     # Total Goal Odd/Even (Total Goal O/E)
     total_goal_oe = "O" if total_goals % 2 == 1 else "E"
@@ -335,7 +339,7 @@ def collect_teams_data(matches, team_names, columns):
             print(f"Added data for `{team_name}` with `{len(match_data)}` rows")
         else:
             team_data[team_name] = pd.DataFrame()
-            print(f'**Empty match data')
+            print(f'**Empty match data: `{team_name}`')
             
     return team_data
 
@@ -464,7 +468,7 @@ def save_excel(team_data, output_file="sofascore.xlsx"):
                 # Set a reasonable column width (adjust as needed)
                 worksheet.column_dimensions[col_letter].width = max(len(column) + 2, 12)
         else:
-            print(f'**Empty match data: {team_name}')
+            print(f'**Empty match data: `{team_name}`')
 
     writer.close()
     print(f"Excel file saved as `{output_file}`")
