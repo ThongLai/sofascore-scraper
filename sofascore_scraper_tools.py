@@ -12,6 +12,13 @@ from openpyxl.styles import PatternFill, Alignment
 from typing import Union
 from botasaurus.request import request, Request
 
+# Add some more leagues
+sfc.sofascore.comps.update({
+    'EFL': 21,
+    'FA': 19,
+    'Emirates': 1295,
+    'League One': 24
+})
 ALL_LEAGUE = list(sfc.sofascore.comps.keys())
 API_PREFIX = 'https://api.sofascore.com/api/v1'
 
