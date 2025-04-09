@@ -11,7 +11,11 @@ from openpyxl.utils import get_column_letter
 from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import PatternFill, Alignment
 
+from typing import Union
+from botasaurus.request import request, Request
+
 ALL_LEAGUE = list(sfc.sofascore.comps.keys())
+API_PREFIX = 'https://api.sofascore.com/api/v1'
 
 def get_league_matches(seasons_config='ALL', leagues_config='ALL'):
     """
@@ -100,6 +104,59 @@ def get_team_matches(matches, team_name):
 def is_home_match(match, team_name):
     """Check if team is playing at home in this match."""
     return match['homeTeam']['name'] == team_name
+
+@request(output=None, create_error_logs=False)
+def scrape_odds(req: Request, match_id: Union[str, int]):
+    """ Scrape odds data for a match
+    
+    Parameters
+    ----------
+    req : botasaurus.request.Request
+        The request object provided by the botasaurus decorator
+    match_id : str or int
+        Sofascore match ID
+        
+    Returns
+    -------
+    : dict
+        JSON response containing odds data
+    """
+    url = f'{API_PREFIX}/event/{match_id}/odds/1/all'
+    response = req.get(url)
+    
+    if response.status_code == 200:
+        odds_data = response.json()
+        if not odds_data or 'markets' not in odds_data:
+            return pd.DataFrame()
+        
+        markets_list = []
+        
+        for market in odds_data['markets']:
+            for choice in market.get('choices', []):
+                markets_list.append({
+                    'structureType': market.get('structureType'),
+                    'marketId': market.get('marketId'),
+                    'marketName': market.get('marketName'),
+                    'isLive': market.get('isLive'),
+                    'fid': market.get('fid'),
+                    'suspended': market.get('suspended', False),
+                    'id': market.get('id'),
+                    'marketGroup': market.get('marketGroup'),
+                    'marketPeriod': market.get('marketPeriod'),
+                    'initial_fractional_odds': choice.get('initialFractionalValue'),
+                    'fractional_odds': choice.get('fractionalValue'),
+                    'sourceId': choice.get('sourceId'),
+                    'selection': choice.get('name'),
+                    'winning': choice.get('winning'),
+                    'change': choice.get('change'),
+                    'choiceGroup': market.get('choiceGroup')
+                })
+        
+        return pd.DataFrame(markets_list)
+    else:
+        import warnings
+        warnings.warn(f"\nReturned {response.status_code} from {url}. Returning empty dictionary.")
+        return pd.DataFrame()
 
 def collect_match_data(match, team_name):
     """Collect match data for the specified team."""
@@ -206,10 +263,18 @@ def collect_match_data(match, team_name):
             cards_ht = f"{cards_1st['home']}-{cards_1st['away']}" if is_home else f"{cards_1st['away']}-{cards_1st['home']}"
         except:
             pass
+
+    # -----------Get match odds------------
+    odds_data = scrape_odds(match_id)
+
+    selection = odds_data[odds_data['marketName'].str.contains('handicap')]['selection']
+    selection = selection[selection.str.contains(team_name)].iloc[0]
+
+    # Extract the handicap value (Handicap Value)
+    handicap_value = float(selection.split(") ")[0].strip("("))
         
-    # ASIAN Handicap - this would require additional data not easily available from basic stats
+    # The asian handicap will be calculated based on the handicap value using the excel formula
     asian_handicap = None
-    handicap_value = None
 
     # Create a dictionary with all the processed data
     data = [
