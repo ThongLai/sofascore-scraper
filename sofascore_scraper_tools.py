@@ -127,6 +127,7 @@ def scrape_odds(req: Request, match_id: Union[str, int]):
     if response.status_code == 200:
         odds_data = response.json()
         if not odds_data or 'markets' not in odds_data:
+            print(f"**No odds data for match ID {match_id}")
             return pd.DataFrame()
         
         markets_list = []
@@ -143,8 +144,8 @@ def scrape_odds(req: Request, match_id: Union[str, int]):
                     'id': market.get('id'),
                     'marketGroup': market.get('marketGroup'),
                     'marketPeriod': market.get('marketPeriod'),
-                    'initial_fractional_odds': choice.get('initialFractionalValue'),
-                    'fractional_odds': choice.get('fractionalValue'),
+                    'initialFractionalValue': choice.get('initialFractionalValue'),
+                    'fractionalValue': choice.get('fractionalValue'),
                     'sourceId': choice.get('sourceId'),
                     'selection': choice.get('name'),
                     'winning': choice.get('winning'),
@@ -154,8 +155,7 @@ def scrape_odds(req: Request, match_id: Union[str, int]):
         
         return pd.DataFrame(markets_list)
     else:
-        import warnings
-        warnings.warn(f"\nReturned {response.status_code} from {url}. Returning empty dictionary.")
+        # print(f"\nReturned {response.status_code} from {url}. Returning empty dictionary.")
         return pd.DataFrame()
 
 def collect_match_data(match, team_name):
@@ -267,12 +267,17 @@ def collect_match_data(match, team_name):
     # -----------Get match odds------------
     odds_data = scrape_odds(match_id)
 
-    selection = odds_data[odds_data['marketName'].str.contains('handicap')]['selection']
-    selection = selection[selection.str.contains(team_name)].iloc[0]
+    handicap_value = None
+    
+    try:
+        selection = odds_data[odds_data['marketName'].str.contains('handicap')]['selection']
+        selection = selection[selection.str.contains(team_name)].iloc[0]
 
-    # Extract the handicap value (Handicap Value)
-    handicap_value = float(selection.split(") ")[0].strip("("))
-        
+        # Extract the handicap value (Handicap Value)
+        handicap_value = float(selection.split(") ")[0].strip("("))
+    except:
+        pass
+
     # The asian handicap will be calculated based on the handicap value using the excel formula
     asian_handicap = None
 
@@ -317,7 +322,7 @@ def collect_teams_data(matches, team_names, columns):
                     # Append the data to the match_data list
                     match_data.append(dict(zip(columns, data)))
                 except Exception as e:
-                    print(f"Error processing match `{match['id']}` for `{team_name}`: `{str(e)}`")
+                    print(f"Error processing match `{int(match['id'])}` for `{team_name}`: `{str(e)}`")
                     continue
         
         # Create dataframe
