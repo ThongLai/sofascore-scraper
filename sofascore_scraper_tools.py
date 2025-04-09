@@ -2,8 +2,6 @@ import pandas as pd
 import numpy as np
 import ScraperFC as sfc
 from datetime import datetime
-import os
-import time
 from tqdm import tqdm
 import warnings
 
@@ -17,16 +15,20 @@ from botasaurus.request import request, Request
 ALL_LEAGUE = list(sfc.sofascore.comps.keys())
 API_PREFIX = 'https://api.sofascore.com/api/v1'
 
+
+from tqdm import tqdm
+import pandas as pd
+
 def get_league_matches(seasons_config='ALL', leagues_config='ALL'):
     """
     Retrieves match data for specified leagues and seasons from Sofascore.
     
     Parameters:
     -----------
-    leagues : list or str
-        League(s) to fetch match data for. Defaults to ALL_LEAGUE constant.
-    seasons : list or str
-        Season(s) to fetch match data for. Defaults to SEASON constant.
+    leagues_config : list or str
+        League(s) to fetch match data for.
+    seasons_config : list or str
+        Season(s) to fetch match data for.
         
     Returns:
     --------
@@ -36,20 +38,21 @@ def get_league_matches(seasons_config='ALL', leagues_config='ALL'):
     # Initialize an empty DataFrame to store all matches
     all_matches = pd.DataFrame()
 
-    # Convert single values to lists for consistent processing
+    # Convert single values into lists for consistent processing
     if not isinstance(leagues_config, list):
         leagues_config = [leagues_config]
     
     if not isinstance(seasons_config, list):
         seasons_config = [seasons_config]
-    
-    # Iterate through each combination of season and league
+
+    # Determine leagues to process
     if not leagues_config or leagues_config[0].upper() == "ALL":
         leagues = ALL_LEAGUE
     else:
         leagues = leagues_config
 
     for league in leagues:
+        # Determine seasons for the current league
         if not seasons_config or seasons_config[0].upper() == "ALL":
             seasons = list(sfc.Sofascore().get_valid_seasons(league).keys())
         elif seasons_config[0].upper() == "LATEST":
@@ -57,9 +60,10 @@ def get_league_matches(seasons_config='ALL', leagues_config='ALL'):
         else:
             seasons = seasons_config
 
-        for season in seasons:
+        # Nested progress bar for seasons
+        for season in tqdm(seasons, desc=f"Processing Seasons for `{league}`"):
             try:
-                # Get match data from Sofascore API
+                # Get match data from the Sofascore API
                 matches = pd.DataFrame(
                     sfc.Sofascore().get_match_dicts(season, league)
                 )
